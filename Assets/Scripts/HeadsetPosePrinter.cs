@@ -62,6 +62,6 @@ public class HeadsetPosePrinter : MonoBehaviour
         headsetPoseMsg.pose.orientation.y = rotFLU.y;
         headsetPoseMsg.pose.orientation.z = rotFLU.z;
         headsetPoseMsg.pose.orientation.w = rotFLU.w;
-        // ros.Publish(topicName, headsetPoseMsg);
+        ros.Publish(topicName, headsetPoseMsg);
     }
 }
