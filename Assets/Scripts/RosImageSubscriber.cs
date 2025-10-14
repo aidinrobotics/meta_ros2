@@ -67,7 +67,9 @@ public class RosImageSubscriber : MonoBehaviour
     {
 
         try
-        {   textMesh.text = msg.header.stamp.sec.ToString() + "." + msg.header.stamp.nanosec.ToString();
+        {   
+            if (textMesh != null)
+                textMesh.text = msg.header.stamp.sec.ToString() + "." + msg.header.stamp.nanosec.ToString();
 
             Texture2D _input = new Texture2D(2, 2);
             ImageConversion.LoadImage(_input, msg.data);
