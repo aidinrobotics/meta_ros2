@@ -11,7 +11,7 @@ public class HeadsetPosePrinter : MonoBehaviour
     public TextMeshPro textMesh;       // 3D TextMeshPro 오브젝트
     ROSConnection ros;
     public string topicName = "hmd_pose";
-    public string frameId = "hmd";
+    public string frameId = "vr_origin";
     public float publishHz = 30f;
     float publishInterval;
     float nextPublishTime;
