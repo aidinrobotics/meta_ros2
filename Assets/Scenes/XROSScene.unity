@@ -1880,7 +1880,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::TFPublisher
   centerEyeAnchor: {fileID: 0}
   leftHandAnchor: {fileID: 313429320}
-  rightHandAnchor: {fileID: 1440334952}
+  rightHandAnchor: {fileID: 1681873062}
   headsetFrame: hmd
   handFrameLeft: hand_left
   handFrameRight: hand_right
@@ -3001,7 +3001,7 @@ MonoBehaviour:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 557229506}
-  m_Enabled: 0
+  m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 54c16b381e28e8d479237771d234dbae, type: 3}
   m_Name: 
@@ -4256,7 +4256,7 @@ MonoBehaviour:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 797477632}
-  m_Enabled: 0
+  m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 54c16b381e28e8d479237771d234dbae, type: 3}
   m_Name: 
