@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using UnityEngine;
 using Unity.Robotics.ROSTCPConnector;
 using RosMessageTypes.Geometry;
+using RosMessageTypes.Sensor;
 using RosMessageTypes.Tf2;
 using RosMessageTypes.Std;
 using Unity.Robotics.ROSTCPConnector.ROSGeometry;
@@ -15,12 +16,13 @@ public class TFPublisher : MonoBehaviour
     public Transform leftHandAnchor;
     public Transform rightHandAnchor;
 
+    public string rootFrame = "world";
     public string headsetFrame = "hmd";
     public string handFrameLeft = "hand_left";
     public string handFrameRight = "hand_right";
     public string tfTopic = "tf";
 
-    public float publishHz = 30f;
+    public float publishHz = 60f;
     public TextMeshPro textMesh;
 
     float publishInterval;
@@ -29,13 +31,13 @@ public class TFPublisher : MonoBehaviour
     private ROSConnection ros;
 
     private HeaderMsg odomHeader;
-    private string rootFrame = "vr_origin";
 
     private int _decimator = 1;
     private int _frameCounter = 0;
 
     // XR Hands
     XRHandSubsystem _handSubsystem;
+    public HandSkeletonMapperBase mapper;  // ← 인스펙터에서 SkeletonMapper 드롭
 
     // 재사용 버퍼
     private readonly List<TransformStampedMsg> _tfBuffer = new List<TransformStampedMsg>(128);
@@ -55,10 +57,16 @@ public class TFPublisher : MonoBehaviour
         // XRHandSubsystem 가져오기
         var loader = XRGeneralSettings.Instance?.Manager?.activeLoader;
         _handSubsystem = loader?.GetLoadedSubsystem<XRHandSubsystem>();
+
         if (_handSubsystem == null)
             Debug.LogWarning("XRHandSubsystem not found. Check OpenXR + XR Hands settings.");
+        else{
+            ros.RegisterPublisher<JointStateMsg>(mapper.leftJointTopic);
+            ros.RegisterPublisher<JointStateMsg>(mapper.rightJointTopic);
+        }
 
         publishInterval = (publishHz > 0f) ? (1f / publishHz) : 0f;
+
     }
 
     void OnEnable()
@@ -102,6 +110,13 @@ public class TFPublisher : MonoBehaviour
         // 3) Publish
         var tfMsg = new TFMessageMsg { transforms = _tfBuffer.ToArray() };
         ros.Publish(tfTopic, tfMsg);
+
+        // Optional: 맵퍼에 Hand 데이터 전달 → 맵퍼가 자체적으로 JointState 발행
+        // if (_handSubsystem != null && mapper != null)
+        {
+            mapper.Publish(_handSubsystem.leftHand,  leftHandAnchor,
+                           _handSubsystem.rightHand, rightHandAnchor);
+        }
     }
 
     void PublishBaseTFs()
