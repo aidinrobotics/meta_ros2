@@ -1859,7 +1859,6 @@ GameObject:
   m_Component:
   - component: {fileID: 391107589}
   - component: {fileID: 391107588}
-  - component: {fileID: 391107590}
   m_Layer: 0
   m_Name: TFPublisher
   m_TagString: Untagged
@@ -1889,7 +1888,7 @@ MonoBehaviour:
   tfTopic: tf
   publishHz: 60
   textMesh: {fileID: 1362053247}
-  mapper: {fileID: 391107590}
+  mapper: {fileID: 0}
 --- !u!4 &391107589
 Transform:
   m_ObjectHideFlags: 0
@@ -1905,20 +1904,6 @@ Transform:
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!114 &391107590
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 391107587}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 17b62f5e7cd56b0368cd2796c8ab9de7, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::AidinSkeletonMapper
-  leftJointTopic: left_hand/joint_states
-  rightJointTopic: right_hand/joint_states
 --- !u!1 &426270238
 GameObject:
   m_ObjectHideFlags: 0
