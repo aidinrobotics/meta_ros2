@@ -16,7 +16,7 @@ public class TFPublisher : MonoBehaviour
     public Transform leftHandAnchor;
     public Transform rightHandAnchor;
 
-    public string rootFrame = "world";
+    public string rootFrame = "vr_world";
     public string headsetFrame = "hmd";
     public string handFrameLeft = "hand_left";
     public string handFrameRight = "hand_right";
