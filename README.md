@@ -39,13 +39,17 @@ Go to `Window > Package Manager` and install the following:
 - **XR Hands**
 - **XR Interaction Toolkit**
 
-### 2.3 Build Settings
+### 2.3 Setup Host PC IP
+- From Scene Hierarchy, click `RosManager`
+- Set `default IP` as Host IP address
+
+### 2.4 Build Settings
 
 - `File > Build Profiles`
   - `Scene List`
-  - Check "Scenes/XROSScene"
+  - Check `Scenes/XROSScene`
 
-### 2.4 Build and Run
+### 2.5 Build and Run
 
 - Connect Meta Quest via USB
 - Click **Build and Run**
@@ -53,46 +57,13 @@ Go to `Window > Package Manager` and install the following:
 
 ---
 
-### Example: Right Arm
+### Tutorial
 
-```python
-right_builder = (
-    rby.CartesianImpedanceControlCommandBuilder()
-    .set_joint_stiffness([80, 80, 80, 80, 80, 80, 40])         # 7 Joints (Joint 0–5: 80 Nm/rad, Joint 6: 40 Nm/rad)
-    .set_joint_torque_limit([30]*7)             # Torque clamped to ±30 Nm
-    .add_joint_limit("right_arm_3", -2.6, -0.5) # Prevent overstretch / singularity
-    .add_target("base", "link_right_arm_6", right_T, 2, np.pi*2, 20, np.pi*80)
-          # move "link_right_arm_6" link to `right_T` with respect to "base"
-          # (linear velocity limit: 2 m/s,
-          #  angular velocity limit: 2π rad/s,
-          #  linear acceleration limit: 20 m/s²,
-          #  angular acceleration limit: 80π rad/s²)
-)
+1. Launch ROS-TCP-Endpoint to get meta quest data
+
+```bash
+ros2 launch ros_tcp_endpoint endpoint.launch
 ```
 
----
+2. Run installed meta_ros2 app in the VR Headset
 
-### Composition
-
-```python
-ctrl_builder = (
-    rby.BodyComponentBasedCommandBuilder()
-    .set_torso_command(torso_builder)
-    .set_right_arm_command(right_builder)
-    .set_left_arm_command(left_builder)
-)
-```
-
-> Tip: When `--whole_body` is used, the torso, right arm, and left arm targets are added into a **single CartesianImpedanceControlCommandBuilder**, instead of splitting by body part.
-
-This `ctrl_builder` is passed into the robot control stream:
-
-```python
-stream.send_command(
-    rby.RobotCommandBuilder().set_command(
-        rby.ComponentBasedCommandBuilder()
-        .set_body_command(ctrl_builder)
-        ...
-    )
-)
-```
