@@ -1,12 +1,41 @@
-
-Library/
-
-Temp/
-
-Logs/
-
+# Unity generated / caches
+[Ll]ibrary/
+[Tt]emp/
+[Oo]bj/
+[Bb]uild/
+[Bb]uilds/
+[Ll]ogs/
+[Mm]emoryCaptures/
+.utmp/
 .utmp
 
-Builds/
+# Auto-generated project files (IDE)
+.vs/
+.vscode/
+.idea/
+*.csproj
+*.unityproj
+*.sln
+*.slnx
+*.suo
+*.user
+*.userprefs
+*.pidb
+*.booproj
+*.svd
+*.pdb
+*.mdb
+*.opendb
+*.VC.db
 
-Build/
+# Build artifacts
+*.apk
+*.aab
+*.unitypackage
+*.app
+ExportedObj/
+crashlytics-build.properties
+
+# OS
+.DS_Store
+Thumbs.db
