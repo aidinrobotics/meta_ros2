@@ -29,21 +29,46 @@ namespace VrTeleop
 
 #if USE_META_XR
         OVROverlay _overlay;
+        RtpH264Receiver _rx;
+        bool _surfaceInit;
 
         void Awake()
         {
             _overlay = GetComponent<OVROverlay>();
             if (_overlay == null) _overlay = gameObject.AddComponent<OVROverlay>();
+            _rx = GetComponent<RtpH264Receiver>();
 
             _overlay.currentOverlayShape = OVROverlay.OverlayShape.Quad;
             _overlay.isExternalSurface = true;
-            _overlay.externalSurfaceWidth = decoder.width;   // SBS 폭
-            _overlay.externalSurfaceHeight = decoder.height;
+            _overlay.overrideTextureRectMatrix = true;
+            // 실제 해상도(SPS)가 확정될 때까지 external surface 생성을 보류한다.
+            // (external surface 는 생성 전에 크기를 정해야 하므로 SPS 파싱 후 켠다)
+            _overlay.enabled = false;
+        }
+
+        // SPS 로 해상도가 확정되면 그 크기로 surface 를 생성 (영상 크기에 유동 대응)
+        void InitSurface()
+        {
+            int w = _rx != null ? _rx.VideoWidth : 0;
+            int h = _rx != null ? _rx.VideoHeight : 0;
+            if (w <= 0 || h <= 0)
+            {
+                // SPS 는 왔지만 파싱 실패 -> VideoDecoder 인스펙터 기본값으로 폴백
+                if (_rx == null || !_rx.HasParameterSets || decoder == null) return; // 아직 SPS 안 옴 -> 대기
+                w = decoder.width; h = decoder.height;
+            }
+
+            _overlay.externalSurfaceWidth = w;
+            _overlay.externalSurfaceHeight = h;
+            if (decoder != null) { decoder.width = w; decoder.height = h; }
 
             _overlay.externalSurfaceObjectCreated += OnSurfaceCreated;
-
-            _overlay.overrideTextureRectMatrix = true;
+            _overlay.enabled = true;   // OnEnable -> external surface 생성
             ApplyRects();
+            _lastC = convergence;
+            _lastSwap = swapEyes;
+            _surfaceInit = true;
+            Debug.Log($"[Overlay] video {w}x{h} -> external surface");
         }
 
         // SBS 좌/우 절반을 각 눈에 매핑 + convergence 만큼 dest 를 좌우로 밀어 수평 시차 조정
@@ -66,6 +91,8 @@ namespace VrTeleop
 
         void Update()
         {
+            if (!_surfaceInit) { InitSurface(); return; }
+
             HandleInput();
 
             // 값이 바뀌었을 때만 rect 재적용 (버튼/Inspector 변경 모두 여기서 반영)

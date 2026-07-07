@@ -607,6 +607,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::VrTeleop.RtpH264Receiver
   port: 5600
   maxQueued: 3
+  waitForIdrOnLoss: 0
 --- !u!4 &932641486
 Transform:
   m_ObjectHideFlags: 0
