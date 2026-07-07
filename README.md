@@ -1,96 +1,95 @@
-# meta_ros2 — RB-Y1 VR Teleoperation (Meta Quest 3)
+# meta_ros2 — RB-Y1 VR 원격조작 (Meta Quest 3)
 
-Meta Quest 3 Unity app for **bidirectional, low-latency VR teleoperation** of the RB-Y1
-robot. Two independent subsystems run in one app:
+RB-Y1 로봇의 **양방향 저지연 VR 원격조작**을 위한 Meta Quest 3 Unity 앱. 한 앱 안에서
+두 서브시스템이 독립적으로 동작한다.
 
-| Direction | Data | Transport | Why |
-|-----------|------|-----------|-----|
-| **Downlink** (streaming PC → Quest) | Stereo camera (SBS) | **RTP / H.264 over UDP** | high bandwidth, latency-sensitive, drop-tolerant |
-| **Uplink** (Quest → control PC) | Head + hand pose | **ROS-TCP (TCP)** | small, high-rate (60 Hz), lossless, ordered |
+| 방향 | 데이터 | 전송 | 이유 |
+|------|--------|------|------|
+| **다운링크** (스트리밍 PC → Quest) | 스테레오 카메라(SBS) | **RTP / H.264 over UDP** | 대역폭 큼, 지연 민감, 유실 허용 |
+| **업링크** (Quest → 제어 PC) | 헤드셋 + 손 포즈 | **ROS-TCP (TCP)** | 작음, 고빈도(60Hz), 무손실·순서 보장 |
 
-> The two streams are deliberately kept on separate channels — do **not** bundle video (UDP)
-> and pose (TCP) together.
+> 두 스트림은 **의도적으로 채널을 분리**한다 — 영상(UDP)과 포즈(TCP)를 한 채널에 묶지 않는다.
 
 ```
-[Streaming PC]                                   [Meta Quest 3 app]
+[스트리밍 PC]                                    [Meta Quest 3 앱]
  ZED SBS ─ GStreamer ─ x264 ─ RTP/H.264 ──UDP:5600──▶ RtpH264Receiver
                                                      └▶ VideoDecoder (MediaCodec)
-                                                        └▶ OVROverlay (SBS → L/R eye)
- CenterEye + Hand tracking ─ ROSConnection ──TCP:10000──▶ ROS-TCP-Endpoint (control PC)
-                                                          /vr/head_pose, /vr/{left,right}_hand
+                                                        └▶ OVROverlay (SBS → 좌/우 눈)
+ CenterEye + 손 트래킹 ─ ROSConnection ──TCP:10000──▶ ROS-TCP-Endpoint (제어 PC)
+                                                       /vr/head_pose, /vr/{left,right}_hand
 ```
 
 ---
 
-## Components
+## 구성 요소
 
-All runtime scripts live in [`Assets/Scripts/`](Assets/Scripts):
+런타임 스크립트는 모두 [`Assets/Scripts/`](Assets/Scripts) 에 있다:
 
-| Script | Role |
-|--------|------|
-| `RtpH264Receiver.cs` | UDP socket (port 5600), RTP depacketize (single NAL / STAP-A / **FU-A** reassembly per RFC 6184), collects SPS/PPS, emits Annex-B access units |
-| `VideoDecoder.cs` | Drives `MediaCodec("video/avc")` via AndroidJNI (no `.aar`), `low-latency=1`, renders to the OVROverlay external surface |
-| `VideoOverlayController.cs` | OVROverlay external surface, splits SBS into left `(0,0,0.5,1)` / right `(0.5,0,0.5,1)` eyes, convergence / eye-swap tuning |
-| `VrTeleopPublisher.cs` | Publishes head + hand pose over ROS-TCP at 60 Hz, with Unity→ROS `FLU` coordinate conversion |
+| 스크립트 | 역할 |
+|----------|------|
+| `RtpH264Receiver.cs` | UDP 소켓(5600), RTP 디페이로타이징(단일 NAL / STAP-A / **FU-A** 재조립, RFC 6184), SPS/PPS 수집, Annex-B access unit 생성 |
+| `VideoDecoder.cs` | `MediaCodec("video/avc")` 를 AndroidJNI 로 직접 구동(`.aar` 불필요), `low-latency=1`, OVROverlay 외부 서피스로 렌더 |
+| `VideoOverlayController.cs` | OVROverlay 외부 서피스, SBS 를 좌 `(0,0,0.5,1)` / 우 `(0.5,0,0.5,1)` 눈으로 분리, 컨버전스·좌우스왑 튜닝 |
+| `VrTeleopPublisher.cs` | 헤드셋+손 포즈를 ROS-TCP 로 60Hz 발행, Unity→ROS `FLU` 좌표 변환 |
 
-See [`Assets/Scripts/README_VrTeleop.md`](Assets/Scripts/README_VrTeleop.md) for detailed scene-wiring steps.
+씬 배선 상세는 [`Assets/Scripts/README_VrTeleop.md`](Assets/Scripts/README_VrTeleop.md) 참고.
 
 ---
 
-## Requirements
+## 요구 사항
 
-- **Meta Quest 3** (Developer Mode enabled)
-- **Unity 6000.3.x** with Android Build Support (IL2CPP + ARM64, min SDK 32)
+- **Meta Quest 3** (개발자 모드 활성화)
+- **Unity 6000.3.x** + Android Build Support (IL2CPP + ARM64, min SDK 32)
 - **Meta XR Core SDK** (`com.meta.xr.sdk.core`) — OVRCameraRig, OVROverlay, OVRSkeleton
-- **ROS-TCP-Connector** (Unity) + **ROS-TCP-Endpoint** (control PC, ROS 2 Humble)
-- Streaming PC with **GStreamer 1.x** (`x264enc`, `rtph264pay`, `h264parse`, `udpsink`)
+- **ROS-TCP-Connector** (Unity) + **ROS-TCP-Endpoint** (제어 PC, ROS 2 Humble)
+- 스트리밍 PC 에 **GStreamer 1.x** (`x264enc`, `rtph264pay`, `h264parse`, `udpsink`)
 
 ---
 
-## Unity setup
+## Unity 설정
 
-### 1. Packages
+### 1. 패키지
 - Meta XR Core SDK (Unity Registry / Meta All-in-One SDK)
 - ROS-TCP-Connector:
   `https://github.com/Unity-Technologies/ROS-TCP-Connector.git?path=/com.unity.robotics.ros-tcp-connector`
 
-> `geometry_msgs` / `std_msgs` are **bundled** with ROS-TCP-Connector — do **not** re-generate
-> them (duplicate types cause CS0029). Use *Generate ROS Messages* only for custom messages.
+> `geometry_msgs` / `std_msgs` 는 ROS-TCP-Connector 에 **기본 내장**돼 있다 — 다시 생성하지 말 것
+> (타입 중복 → CS0029). *Generate ROS Messages* 는 커스텀 메시지에만 사용한다.
 
 ### 2. Scripting Define Symbols
 `Player Settings → Android → Scripting Define Symbols`:
 ```
 USE_META_XR;USE_ROS_TCP
 ```
-(SDK-specific code is guarded by these; the project still compiles before the packages are installed.)
+(SDK 의존 코드는 이 심볼로 가드돼 있어, 패키지 설치 전에도 프로젝트가 컴파일된다.)
 
-### 3. Scene (`Assets/Scenes/SampleScene.unity`)
+### 3. 씬 (`Assets/Scenes/SampleScene.unity`)
 - **OVRCameraRig** (OVRManager: Hand Tracking = *Controllers And Hands*, Quest 3)
-- **VideoLayer** (child of `CenterEyeAnchor`): `OVROverlay` + `RtpH264Receiver` + `VideoDecoder` + `VideoOverlayController`; quad scaled **16:9**
+- **VideoLayer** (`CenterEyeAnchor` 자식): `OVROverlay` + `RtpH264Receiver` + `VideoDecoder` + `VideoOverlayController`; Quad 스케일 **16:9**
 - **RosBridge**: `ROSConnection` + `VrTeleopPublisher` (head = CenterEyeAnchor, hands = OVRSkeleton)
 
-### 4. ROS connection
-`Robotics → ROS Settings`: ROS IP = control-PC IP, port `10000`, protocol **ROS2**.
+### 4. ROS 연결
+`Robotics → ROS Settings`: ROS IP = 제어 PC IP, 포트 `10000`, 프로토콜 **ROS2**.
 
-### 5. Passthrough (see-through background)
+### 5. 패스스루 (실공간 배경)
 - OVRManager: Passthrough Support = *Supported*, **Enable Passthrough**
-- Add **OVRPassthroughLayer** (Placement = *Underlay*)
-- CenterEye Camera → `Environment → Background Type = Solid Color`, color alpha **0**
+- **OVRPassthroughLayer** 추가 (Placement = *Underlay*)
+- CenterEye Camera → `Environment → Background Type = Solid Color`, 색상 알파 **0**
 
-### 6. Build
-`Internet Access = Require` (needed for the UDP socket), then **Build And Run**.
+### 6. 빌드
+`Internet Access = Require` (UDP 소켓에 필요) 후 **Build And Run**.
 
 ---
 
-## Video downlink — streaming PC (GStreamer)
+## 영상 다운링크 — 스트리밍 PC (GStreamer)
 
-The app receives **raw RTP / H.264 over UDP** on port **5600** (payload type 96). The streaming
-PC publishes with a GStreamer pipeline whose tail must be `rtph264pay ! udpsink`.
+앱은 포트 **5600** 에서 **raw RTP / H.264 over UDP** (payload type 96) 를 수신한다. 스트리밍 PC 는
+파이프라인 끝이 `rtph264pay ! udpsink` 인 GStreamer 로 발행한다.
 
-### Publish (streaming PC → Quest)
+### 발행 (스트리밍 PC → Quest)
 
-Send a **side-by-side (SBS) stereo** H.264 stream to the headset. Replace `<QUEST_IP>` with the
-Quest's LAN IP and the source with your camera (`videotestsrc` shown for a quick test):
+**side-by-side(SBS) 스테레오** H.264 스트림을 헤드셋으로 전송한다. `<QUEST_IP>` 를 Quest 의 LAN IP 로,
+소스를 실제 카메라로 바꾼다 (아래는 빠른 테스트용 `videotestsrc`):
 
 ```bash
 gst-launch-1.0 -v \
@@ -102,85 +101,85 @@ gst-launch-1.0 -v \
   udpsink host=<QUEST_IP> port=5600 sync=false
 ```
 
-Key points that must match the receiver:
-- **`rtph264pay pt=96 config-interval=1`** — payload 96, and SPS/PPS re-sent every keyframe so a
-  late-joining decoder initializes quickly.
-- **`profile=baseline`, `bframes=0`, `tune=zerolatency`** — no reorder delay.
-- Frame is **SBS**: left half → left eye, right half → right eye (handled by `VideoOverlayController`).
-  Default expected size is **2560×720** (per-eye 1280×720); update `VideoDecoder.width/height` if you change it.
+수신부와 반드시 맞춰야 할 부분:
+- **`rtph264pay pt=96 config-interval=1`** — payload 96, SPS/PPS 를 매 키프레임 재전송하여 늦게 접속한
+  디코더도 빠르게 초기화된다.
+- **`profile=baseline`, `bframes=0`, `tune=zerolatency`** — 프레임 재정렬 지연 제거.
+- 프레임은 **SBS**: 좌측 절반 → 왼눈, 우측 절반 → 오른눈 (`VideoOverlayController` 가 처리).
+  기본 기대 크기는 **2560×720** (눈당 1280×720). 바꾸면 `VideoDecoder.width/height` 도 함께 수정.
 
-### Receive (Unity app)
-`RtpH264Receiver` (UDP:5600) → `VideoDecoder` (MediaCodec) → `OVROverlay`. Nothing to configure
-beyond the port. Logs on success:
+### 수신 (Unity 앱)
+`RtpH264Receiver` (UDP:5600) → `VideoDecoder` (MediaCodec) → `OVROverlay`. 포트 외 별도 설정 없음.
+성공 시 로그:
 ```
 [Rtp] listening udp:5600
 [Overlay] external surface -> decoder
 [Decoder] MediaCodec started
 ```
 
-### Verify on a PC before deploying to the Quest
-Point the sender's `host=` at a desktop and decode there:
+### Quest 배포 전 PC 에서 검증
+발행부의 `host=` 를 데스크톱으로 두고 그곳에서 디코딩:
 ```bash
 gst-launch-1.0 udpsrc port=5600 \
   ! application/x-rtp,media=video,encoding-name=H264,payload=96 \
   ! rtph264depay ! h264parse ! avdec_h264 ! autovideosink sync=false
 ```
-(Needs `gstreamer1.0-libav` for `avdec_h264` and `gstreamer1.0-plugins-bad` for `h264parse`.)
+(`avdec_h264` 는 `gstreamer1.0-libav`, `h264parse` 는 `gstreamer1.0-plugins-bad` 필요.)
 
-### RTSP relay (optional, higher quality / GPU offload)
-For a desktop-GPU pipeline (NVENC H.265, higher resolution), the streaming PC can publish to an
-**RTSP server** (e.g. MediaMTX) with GStreamer/ffmpeg:
+### RTSP 릴레이 (선택, 고화질 / GPU 오프로드)
+데스크톱 GPU 파이프라인(NVENC H.265, 고해상도)을 쓰려면 스트리밍 PC 가 **RTSP 서버**(예: MediaMTX)로
+GStreamer/ffmpeg 를 통해 발행할 수 있다:
 ```bash
-# example: re-encode an incoming SBS stream to RTSP via NVENC
+# 예: 들어온 SBS 스트림을 NVENC 로 재인코딩해 RTSP 로 발행
 ffmpeg -i - -c:v hevc_nvenc -preset p1 -tune ll -f rtsp rtsp://127.0.0.1:8554/zed
 ```
-Note: the current in-app receiver consumes **raw RTP/UDP**, not RTSP. Using an RTSP relay requires
-either an RTSP→RTP GStreamer bridge feeding UDP:5600, or adapting `RtpH264Receiver` to perform the
-RTSP handshake. Prefer the direct RTP/UDP path above unless you specifically need the GPU offload.
+주의: 현재 앱 수신부는 **raw RTP/UDP** 를 받으며 RTSP 는 받지 않는다. RTSP 릴레이를 쓰려면
+(a) RTSP→RTP 를 UDP:5600 으로 흘려주는 GStreamer 브리지를 두거나, (b) `RtpH264Receiver` 를 RTSP
+핸드셰이크 지원으로 개조해야 한다. GPU 오프로드가 꼭 필요한 경우가 아니면 위의 직접 RTP/UDP 경로를 권장.
 
 ---
 
-## Pose uplink — control PC (ROS 2)
+## 포즈 업링크 — 제어 PC (ROS 2)
 
-### Topics published by the app
-| Topic | Type | Contents |
-|-------|------|----------|
-| `/vr/head_pose` | `geometry_msgs/PoseStamped` | headset position + orientation |
-| `/vr/left_hand` | `geometry_msgs/PoseArray` | left-hand joint poses |
-| `/vr/right_hand` | `geometry_msgs/PoseArray` | right-hand joint poses |
+### 앱이 발행하는 토픽
+| 토픽 | 타입 | 내용 |
+|------|------|------|
+| `/vr/head_pose` | `geometry_msgs/PoseStamped` | 헤드셋 위치 + 자세 |
+| `/vr/left_hand` | `geometry_msgs/PoseArray` | 왼손 관절 포즈 |
+| `/vr/right_hand` | `geometry_msgs/PoseArray` | 오른손 관절 포즈 |
 
-Poses are published at ~60 Hz with `.To<FLU>()` Unity→ROS conversion and `frame_id = vr_origin`.
+포즈는 약 60Hz 로 발행되며 `.To<FLU>()` Unity→ROS 변환과 `frame_id = vr_origin` 이 적용된다.
 
-### Run the endpoint on the control PC
+### 제어 PC 에서 엔드포인트 실행
 ```bash
 ros2 run ros_tcp_endpoint default_server_endpoint --ros-args -p ROS_IP:=0.0.0.0
-# verify
+# 검증
 ros2 topic hz /vr/head_pose
 ros2 topic echo /vr/head_pose --once
 ```
 
 ---
 
-## In-headset controls (video tuning)
+## 인헤드셋 컨트롤 (영상 튜닝)
 
-| Input | Action |
-|-------|--------|
-| **A** (hold) | decrease stereo convergence |
-| **B** (hold) | increase stereo convergence |
-| **X** | toggle left/right eye swap (if depth looks inverted) |
+| 입력 | 동작 |
+|------|------|
+| **A** (홀드) | 스테레오 컨버전스 감소 |
+| **B** (홀드) | 스테레오 컨버전스 증가 |
+| **X** | 좌/우 눈 스왑 토글 (깊이가 반대로 느껴질 때) |
 
-Find a comfortable value in the log (`[Overlay] convergence=...`), then set it as the default on
-`VideoOverlayController.convergence` and uncheck *Enable Button Tuning*.
+로그(`[Overlay] convergence=...`)에서 편한 값을 찾은 뒤 `VideoOverlayController.convergence` 기본값에
+넣고 *Enable Button Tuning* 을 해제한다.
 
 ---
 
-## Known issue — Meta XR SDK compile error (auto-fixed)
+## 알려진 이슈 — Meta XR SDK 컴파일 에러 (자동 수정됨)
 
-Meta XR Core SDK **v203.0.0** ships `RuntimeOptimizer/Core/RuntimeOptimizerPlugin.cs` with `#define`
-directives placed after `using` statements → **CS1032**, which blocks all compilation. Because
-`Library/PackageCache/` is git-ignored and regenerated, it recurs on every clone / Library wipe.
+Meta XR Core SDK **v203.0.0** 은 `RuntimeOptimizer/Core/RuntimeOptimizerPlugin.cs` 에서 `#define`
+지시문을 `using` 뒤에 두고 shipping 해 **CS1032** 로 전체 컴파일을 막는다. `Library/PackageCache/` 는
+gitignore + 재임포트마다 원본으로 덮여써서 클론 / Library 삭제 때마다 재발한다.
 
-[`Assets/Editor/MetaSdkFix/`](Assets/Editor/MetaSdkFix) contains an isolated Editor assembly
-(`MetaSdkFix.Editor`, no references) that compiles even when the Meta assembly fails, detects the
-broken file on editor load, moves the `#define` block above the `using`s, and triggers recompilation.
-It is a no-op once the file is correct — **just open the project in Unity and let it recompile once.**
+[`Assets/Editor/MetaSdkFix/`](Assets/Editor/MetaSdkFix) 에 참조가 비어 있는 독립 Editor 어셈블리
+(`MetaSdkFix.Editor`)가 있어, Meta 어셈블리가 깨져도 별도로 컴파일된다. 에디터 로드 시 깨진 파일을 감지해
+`#define` 블록을 `using` 위로 옮기고 재컴파일을 요청한다. 이미 정상이면 no-op 이므로 —
+**프로젝트를 Unity 에서 한 번 열어 재컴파일되게 두면 된다.**
