@@ -27,9 +27,9 @@ RB-Y1 로봇의 **양방향 저지연 VR 원격조작**을 위한 Meta Quest 3 U
 
 | 스크립트 | 역할 |
 |----------|------|
-| `RtpH264Receiver.cs` | UDP 소켓(5600), RTP 디페이로타이징(단일 NAL / STAP-A / **FU-A** 재조립, RFC 6184), SPS/PPS 수집, Annex-B access unit 생성 |
+| `RtpH264Receiver.cs` | UDP 소켓(5600), RTP 디페이로타이징(단일 NAL / STAP-A / **FU-A** 재조립, RFC 6184), **SPS에서 해상도 자동 파싱**, RTP 시퀀스 갭 기반 **패킷 손실 처리**(wait-for-IDR / feed-through 토글), 초당 진단 통계 |
 | `VideoDecoder.cs` | `MediaCodec("video/avc")` 를 AndroidJNI 로 직접 구동(`.aar` 불필요), `low-latency=1`, OVROverlay 외부 서피스로 렌더 |
-| `VideoOverlayController.cs` | OVROverlay 외부 서피스, SBS 를 좌 `(0,0,0.5,1)` / 우 `(0.5,0,0.5,1)` 눈으로 분리, 컨버전스·좌우스왑 튜닝 |
+| `VideoOverlayController.cs` | OVROverlay 외부 서피스를 **파싱된 해상도로 생성**, SBS 를 좌 `(0,0,0.5,1)` / 우 `(0.5,0,0.5,1)` 눈으로 분리, 컨트롤러 버튼으로 컨버전스·패널 거리 실시간 튜닝 |
 | `VrTeleopPublisher.cs` | 헤드셋+손 포즈를 ROS-TCP 로 60Hz 발행, Unity→ROS `FLU` 좌표 변환 |
 
 씬 배선 상세는 [`Assets/Scripts/README_VrTeleop.md`](Assets/Scripts/README_VrTeleop.md) 참고.
@@ -65,7 +65,7 @@ USE_META_XR;USE_ROS_TCP
 
 ### 3. 씬 (`Assets/Scenes/SampleScene.unity`)
 - **OVRCameraRig** (OVRManager: Hand Tracking = *Controllers And Hands*, Quest 3)
-- **VideoLayer** (`CenterEyeAnchor` 자식): `OVROverlay` + `RtpH264Receiver` + `VideoDecoder` + `VideoOverlayController`; Quad 스케일 **16:9**
+- **VideoLayer** (`CenterEyeAnchor` 자식): `OVROverlay` + `RtpH264Receiver` + `VideoDecoder` + `VideoOverlayController`; Quad 스케일 **16:9**(1.7778:1), 거리 `localPosition.z`(기본 3m). 해상도는 SPS에서 자동 감지되어 서피스 크기가 자동 정렬됨
 - **RosBridge**: `ROSConnection` + `VrTeleopPublisher` (head = CenterEyeAnchor, hands = OVRSkeleton)
 
 ### 4. ROS 연결
@@ -95,27 +95,42 @@ USE_META_XR;USE_ROS_TCP
 gst-launch-1.0 -v \
   videotestsrc is-live=true ! video/x-raw,width=2560,height=720,framerate=30/1 ! \
   videoconvert ! video/x-raw,format=I420 ! \
-  x264enc tune=zerolatency speed-preset=ultrafast bitrate=15000 key-int-max=30 bframes=0 ! \
+  x264enc tune=zerolatency speed-preset=ultrafast bitrate=12000 key-int-max=6 bframes=0 ! \
   video/x-h264,profile=baseline ! h264parse config-interval=1 ! \
-  rtph264pay pt=96 config-interval=1 ! \
+  rtph264pay pt=96 config-interval=1 mtu=1200 ! \
   udpsink host=<QUEST_IP> port=5600 sync=false
 ```
 
+> Jetson(ZED SBS) 발행 노드는 [`zed_sbs_rtsp_node.py`](zed_sbs_rtsp_node.py) 참고.
+> `--bitrate --gop --preset --intra-refresh --sliced-threads` 인자로 튜닝한다.
+> 예: `--bitrate 12 --gop 6 --preset ultrafast` (Orin Nano SW x264 기준).
+
 수신부와 반드시 맞춰야 할 부분:
-- **`rtph264pay pt=96 config-interval=1`** — payload 96, SPS/PPS 를 매 키프레임 재전송하여 늦게 접속한
+- **`rtph264pay pt=96 config-interval=1`** — payload 96, SPS/PPS 를 주기적으로 재전송하여 늦게 접속한
   디코더도 빠르게 초기화된다.
+- **`mtu=1200`** — RTP 패킷을 UDP 1개에 맞춰 IP 단편화 제거 → 패킷 손실 증폭 방지.
 - **`profile=baseline`, `bframes=0`, `tune=zerolatency`** — 프레임 재정렬 지연 제거.
+- **`key-int-max`(GOP)** — 짧을수록(예 6) 손실 후 복구가 빠름. `intra-refresh` 는 IDR을 없애
+  MediaCodec이 출력 못 하는 경우가 있어 **비권장**.
 - 프레임은 **SBS**: 좌측 절반 → 왼눈, 우측 절반 → 오른눈 (`VideoOverlayController` 가 처리).
-  기본 기대 크기는 **2560×720** (눈당 1280×720). 바꾸면 `VideoDecoder.width/height` 도 함께 수정.
+  해상도는 **SPS에서 자동 감지**되므로 2560×720·3840×1080 등 무엇이든 앱이 알아서 맞춘다
+  (`VideoDecoder.width/height` 는 파싱 실패 시 폴백 기본값).
 
 ### 수신 (Unity 앱)
 `RtpH264Receiver` (UDP:5600) → `VideoDecoder` (MediaCodec) → `OVROverlay`. 포트 외 별도 설정 없음.
 성공 시 로그:
 ```
 [Rtp] listening udp:5600
+[Overlay] video 2560x720 -> external surface
 [Overlay] external surface -> decoder
 [Decoder] MediaCodec started
 ```
+
+**패킷 손실 처리** — `RtpH264Receiver.waitForIdrOnLoss`:
+- **ON**(기본): 손실 시 다음 IDR까지 스킵 → 깨짐 없음, 대신 끊김. GOP 짧을수록 끊김↓.
+- **OFF**: 손실 프레임도 그대로 공급 → 30fps 부드러움, 손실 순간만 약간 깨짐. teleop 권장.
+- 초당 진단 로그(`adb logcat -s Unity | grep "Rtp\] 1s"`): `delivered=fps loss=N waitIDR=N queue=N`.
+  `loss` 가 잦으면 WiFi 손실이 근본 원인 → 유선 백홀 + 전용 5GHz/WiFi6 AP 로 해결.
 
 ### Quest 배포 전 PC 에서 검증
 발행부의 `host=` 를 데스크톱으로 두고 그곳에서 디코딩:
@@ -162,14 +177,17 @@ ros2 topic echo /vr/head_pose --once
 
 ## 인헤드셋 컨트롤 (영상 튜닝)
 
-| 입력 | 동작 |
-|------|------|
-| **A** (홀드) | 스테레오 컨버전스 감소 |
-| **B** (홀드) | 스테레오 컨버전스 증가 |
-| **X** | 좌/우 눈 스왑 토글 (깊이가 반대로 느껴질 때) |
+| 입력 | 손 | 동작 |
+|------|-----|------|
+| **X** (홀드) | 왼손 | 스테레오 컨버전스 감소 |
+| **Y** (홀드) | 왼손 | 스테레오 컨버전스 증가 |
+| **A** (홀드) | 오른손 | 영상 패널 가까이 (`localPosition.z↓`) |
+| **B** (홀드) | 오른손 | 영상 패널 멀리 (`localPosition.z↑`) |
+| 좌/우 눈 스왑 | — | 인스펙터 `Swap Eyes` (깊이가 반대로 느껴질 때) |
 
-로그(`[Overlay] convergence=...`)에서 편한 값을 찾은 뒤 `VideoOverlayController.convergence` 기본값에
-넣고 *Enable Button Tuning* 을 해제한다.
+로그(`[Overlay] convergence=...` / `distance=...`)에서 편한 값을 찾은 뒤,
+`VideoOverlayController.convergence` 와 VideoLayer `localPosition.z` 에 고정하고
+*Enable Button Tuning* 을 해제한다.
 
 ---
 
