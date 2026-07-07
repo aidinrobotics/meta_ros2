@@ -23,9 +23,15 @@ namespace VrTeleop
         [Tooltip("좌/우 눈이 뒤바뀐 것 같으면(깊이가 반대로 느껴지면) 체크")]
         public bool swapEyes = false;
 
-        [Tooltip("A(-)/B(+) 버튼 홀드로 convergence 조절, X 버튼으로 좌우 스왑")]
+        [Tooltip("X(-)/Y(+) convergence(왼손), A(가까이)/B(멀리) 패널 거리(오른손). 좌우 스왑은 인스펙터에서")]
         public bool enableButtonTuning = true;
         public float tuneSpeed = 0.2f;
+
+        [Header("영상 패널 거리 (X/Y 버튼)")]
+        [Tooltip("X(가까이)/Y(멀리) 홀드 시 초당 이동 거리(m)")]
+        public float distanceSpeed = 1.5f;
+        public float minDistance = 0.5f;
+        public float maxDistance = 10f;
 
 #if USE_META_XR
         OVROverlay _overlay;
@@ -111,16 +117,24 @@ namespace VrTeleop
         {
             if (!enableButtonTuning) return;
 
-            // A(One): convergence 감소 / B(Two): 증가 — 홀드하면 연속 조절
+            // X(Three)/Y(Four): convergence −/+ (왼손, 홀드 연속)
             float dir = 0f;
-            if (OVRInput.Get(OVRInput.Button.One)) dir -= 1f;
-            if (OVRInput.Get(OVRInput.Button.Two)) dir += 1f;
+            if (OVRInput.Get(OVRInput.Button.Three)) dir -= 1f;
+            if (OVRInput.Get(OVRInput.Button.Four)) dir += 1f;
             if (dir != 0f)
                 convergence = Mathf.Clamp(convergence + dir * tuneSpeed * Time.deltaTime, -0.3f, 0.3f);
 
-            // X(Three): 좌/우 눈 스왑 토글
-            if (OVRInput.GetDown(OVRInput.Button.Three))
-                swapEyes = !swapEyes;
+            // A(One)/B(Two): 영상 패널 거리(Z) 가까이/멀리 (오른손, 홀드 연속)
+            float dz = 0f;
+            if (OVRInput.Get(OVRInput.Button.One)) dz -= 1f; // A: 가까이
+            if (OVRInput.Get(OVRInput.Button.Two)) dz += 1f; // B: 멀리
+            if (dz != 0f)
+            {
+                var p = transform.localPosition;
+                p.z = Mathf.Clamp(p.z + dz * distanceSpeed * Time.deltaTime, minDistance, maxDistance);
+                transform.localPosition = p;
+                if (Time.frameCount % 15 == 0) Debug.Log($"[Overlay] distance={p.z:F2}m");
+            }
         }
 
         void OnSurfaceCreated()
