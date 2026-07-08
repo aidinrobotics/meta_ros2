@@ -579,6 +579,13 @@ MonoBehaviour:
   swapEyes: 0
   enableButtonTuning: 1
   tuneSpeed: 0.15
+  distanceSpeed: 1.5
+  minDistance: 0.5
+  maxDistance: 10
+  panSpeed: 1
+  stickDeadzone: 0.15
+  maxPanX: 3
+  maxPanY: 3
 --- !u!114 &932641484
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -617,7 +624,7 @@ Transform:
   m_GameObject: {fileID: 932641482}
   serializedVersion: 2
   m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
-  m_LocalPosition: {x: 0, y: 0, z: 3}
+  m_LocalPosition: {x: 0, y: -0.5, z: 3}
   m_LocalScale: {x: 5.33, y: 3, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -639,6 +646,7 @@ GameObject:
   - component: {fileID: 1425391209}
   - component: {fileID: 1425391208}
   - component: {fileID: 1425391207}
+  - component: {fileID: 1425391210}
   m_Layer: 0
   m_Name: RosBridge
   m_TagString: Untagged
@@ -663,6 +671,7 @@ MonoBehaviour:
   frameId: vr_origin
   leftHand: {fileID: 5947363}
   rightHand: {fileID: 682857126}
+  hideHandMesh: 1
 --- !u!114 &1425391208
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -700,6 +709,25 @@ Transform:
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &1425391210
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1425391206}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: b1bd05e9ff24c496bbd90e55f304f04e, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::VrTeleop.IpConfigController
+  defaultIp: 192.168.2.31
+  displayDistance: 1.2
+  textSize: 0.01
+  videoOverlay: {fileID: 0}
+  stickThreshold: 0.6
+  repeatDelay: 0.35
+  repeatInterval: 0.12
 --- !u!1 &1532446787
 GameObject:
   m_ObjectHideFlags: 0

@@ -29,10 +29,12 @@ USE_META_XR;USE_ROS_TCP
    - `VideoDecoder`     (width/height = SBS 해상도. `--scale` 적용 시 맞추기)
    - `VideoOverlayController` (decoder 필드에 위 VideoDecoder 연결)
 3. 빈 GameObject **RosBridge** 생성 후:
-   - `ROSConnection` (Inspector 에서 제어 PC IP / 포트 설정)
+   - `ROSConnection` (Inspector 에서 제어 PC IP / 포트 설정. 앱 내 변경도 가능 — `IpConfigController`)
    - `VrTeleopPublisher`
      - head = OVRCameraRig 의 CenterEyeAnchor
      - leftHand / rightHand = OVRSkeleton (Hand tracking)
+     - hideHandMesh = ON 이면 화면의 3D 손 메시를 숨김(관절 발행은 유지)
+   - `IpConfigController` (왼손 Menu 버튼으로 발행 IP 를 앱 안에서 변경)
 
 ## 5. 데이터 흐름
 ```
@@ -40,7 +42,7 @@ RtpH264Receiver ──Frames(ConcurrentQueue)──> VideoDecoder ──render�
                                                    ▲
 VideoOverlayController: externalSurfaceObject ─────┘ (SBS 좌/우 눈 분리)
 
-VrTeleopPublisher ──ROS-TCP(TCP)──> 제어 PC ROS-TCP-Endpoint  (/vr/head_pose, /vr/{left,right}_hand)
+VrTeleopPublisher ──ROS-TCP(TCP)──> 제어 PC ROS-TCP-Endpoint  (/vr/hmd_pose, /vr/{left,right}_hand_pose)
 ```
 
 ## 6. 테스트 순서

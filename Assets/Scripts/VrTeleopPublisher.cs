@@ -31,6 +31,9 @@ namespace VrTeleop
 #if USE_META_XR
         public OVRSkeleton leftHand;
         public OVRSkeleton rightHand;
+
+        [Tooltip("화면에 보이는 3D 손 메시를 숨김 (관절 발행은 그대로 유지, 렌더링만 끔)")]
+        public bool hideHandMesh = true;
 #endif
 
         float _period, _acc;
@@ -45,7 +48,23 @@ namespace VrTeleop
             _ros.RegisterPublisher<PoseStampedMsg>("/vr/hmd_pose");
             _ros.RegisterPublisher<PoseArrayMsg>("/vr/left_hand_pose");
             _ros.RegisterPublisher<PoseArrayMsg>("/vr/right_hand_pose");
+
+#if USE_META_XR
+            if (hideHandMesh) { HideMesh(leftHand); HideMesh(rightHand); }
+#endif
         }
+
+#if USE_META_XR
+        // 손 관절 추적(OVRSkeleton)은 살려두고, 화면에 그려지는 메시 렌더러만 끈다.
+        static void HideMesh(OVRSkeleton skel)
+        {
+            if (skel == null) return;
+            // OVRHand 가 매 프레임 renderer.enabled 를 트래킹 상태로 되돌리므로,
+            // enabled 대신 forceRenderingOff 를 사용해 렌더링만 확실히 끈다.
+            foreach (var r in skel.GetComponentsInChildren<SkinnedMeshRenderer>(true))
+                r.forceRenderingOff = true;
+        }
+#endif
 
         void Update()
         {

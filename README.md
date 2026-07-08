@@ -16,7 +16,7 @@ RB-Y1 로봇의 **양방향 저지연 VR 원격조작**을 위한 Meta Quest 3 U
                                                      └▶ VideoDecoder (MediaCodec)
                                                         └▶ OVROverlay (SBS → 좌/우 눈)
  CenterEye + 손 트래킹 ─ ROSConnection ──TCP:10000──▶ ROS-TCP-Endpoint (제어 PC)
-                                                       /vr/head_pose, /vr/{left,right}_hand
+                                                       /vr/hmd_pose, /vr/{left,right}_hand_pose
 ```
 
 ---
@@ -29,8 +29,9 @@ RB-Y1 로봇의 **양방향 저지연 VR 원격조작**을 위한 Meta Quest 3 U
 |----------|------|
 | `RtpH264Receiver.cs` | UDP 소켓(5600), RTP 디페이로타이징(단일 NAL / STAP-A / **FU-A** 재조립, RFC 6184), **SPS에서 해상도 자동 파싱**, RTP 시퀀스 갭 기반 **패킷 손실 처리**(wait-for-IDR / feed-through 토글), 초당 진단 통계 |
 | `VideoDecoder.cs` | `MediaCodec("video/avc")` 를 AndroidJNI 로 직접 구동(`.aar` 불필요), `low-latency=1`, OVROverlay 외부 서피스로 렌더 |
-| `VideoOverlayController.cs` | OVROverlay 외부 서피스를 **파싱된 해상도로 생성**, SBS 를 좌 `(0,0,0.5,1)` / 우 `(0.5,0,0.5,1)` 눈으로 분리, 컨트롤러 버튼으로 컨버전스·패널 거리 실시간 튜닝 |
-| `VrTeleopPublisher.cs` | 헤드셋+손 포즈를 ROS-TCP 로 60Hz 발행, Unity→ROS `FLU` 좌표 변환 |
+| `VideoOverlayController.cs` | OVROverlay 외부 서피스를 **파싱된 해상도로 생성**, SBS 를 좌 `(0,0,0.5,1)` / 우 `(0.5,0,0.5,1)` 눈으로 분리, 컨트롤러 버튼·**오른손 스틱**으로 컨버전스·패널 거리·**패널 위치(팬)** 실시간 튜닝 |
+| `VrTeleopPublisher.cs` | 헤드셋+손 포즈를 ROS-TCP 로 60Hz 발행, Unity→ROS `FLU` 좌표 변환, **인식된 3D 손 메시 숨김 옵션**(`hideHandMesh`, 관절 발행은 유지) |
+| `IpConfigController.cs` | **앱 내에서 ROS 발행 IP 변경**(재빌드 불필요). 왼손 Menu 버튼 → 컨트롤러로 옥텟 편집, `PlayerPrefs` 저장(재실행 유지) |
 
 씬 배선 상세는 [`Assets/Scripts/README_VrTeleop.md`](Assets/Scripts/README_VrTeleop.md) 참고.
 
@@ -66,10 +67,13 @@ USE_META_XR;USE_ROS_TCP
 ### 3. 씬 (`Assets/Scenes/SampleScene.unity`)
 - **OVRCameraRig** (OVRManager: Hand Tracking = *Controllers And Hands*, Quest 3)
 - **VideoLayer** (`CenterEyeAnchor` 자식): `OVROverlay` + `RtpH264Receiver` + `VideoDecoder` + `VideoOverlayController`; Quad 스케일 **16:9**(1.7778:1), 거리 `localPosition.z`(기본 3m). 해상도는 SPS에서 자동 감지되어 서피스 크기가 자동 정렬됨
-- **RosBridge**: `ROSConnection` + `VrTeleopPublisher` (head = CenterEyeAnchor, hands = OVRSkeleton)
+- **RosBridge**: `ROSConnection` + `VrTeleopPublisher` + `IpConfigController`
+  - `VrTeleopPublisher`: head = CenterEyeAnchor, hands = OVRSkeleton, `Hide Hand Mesh`(기본 ON)
+  - `IpConfigController`: `Video Overlay` 는 비워두면 자동 검색(씬에 OVROverlay 여러 개면 VideoLayer 직접 지정), `Text Size`(기본 0.01)·`Display Distance`(기본 1.2m) 로 편집 패널 크기 조정
 
 ### 4. ROS 연결
 `Robotics → ROS Settings`: ROS IP = 제어 PC IP, 포트 `10000`, 프로토콜 **ROS2**.
+IP 는 **앱 안에서도 변경 가능**(왼손 Menu 버튼 → IP 편집기, 아래 [인헤드셋 컨트롤](#인헤드셋-컨트롤) 참고). 인앱 변경값이 저장돼 있으면 씬 설정보다 우선한다.
 
 ### 5. 패스스루 (실공간 배경)
 - OVRManager: Passthrough Support = *Supported*, **Enable Passthrough**
@@ -159,9 +163,9 @@ ffmpeg -i - -c:v hevc_nvenc -preset p1 -tune ll -f rtsp rtsp://127.0.0.1:8554/ze
 ### 앱이 발행하는 토픽
 | 토픽 | 타입 | 내용 |
 |------|------|------|
-| `/vr/head_pose` | `geometry_msgs/PoseStamped` | 헤드셋 위치 + 자세 |
-| `/vr/left_hand` | `geometry_msgs/PoseArray` | 왼손 관절 포즈 |
-| `/vr/right_hand` | `geometry_msgs/PoseArray` | 오른손 관절 포즈 |
+| `/vr/hmd_pose` | `geometry_msgs/PoseStamped` | 헤드셋 위치 + 자세 |
+| `/vr/left_hand_pose` | `geometry_msgs/PoseArray` | 왼손 관절 포즈 |
+| `/vr/right_hand_pose` | `geometry_msgs/PoseArray` | 오른손 관절 포즈 |
 
 포즈는 약 60Hz 로 발행되며 `.To<FLU>()` Unity→ROS 변환과 `frame_id = vr_origin` 이 적용된다.
 
@@ -169,25 +173,42 @@ ffmpeg -i - -c:v hevc_nvenc -preset p1 -tune ll -f rtsp rtsp://127.0.0.1:8554/ze
 ```bash
 ros2 run ros_tcp_endpoint default_server_endpoint --ros-args -p ROS_IP:=0.0.0.0
 # 검증
-ros2 topic hz /vr/head_pose
-ros2 topic echo /vr/head_pose --once
+ros2 topic hz /vr/hmd_pose
+ros2 topic echo /vr/hmd_pose --once
 ```
 
 ---
 
-## 인헤드셋 컨트롤 (영상 튜닝)
+## 인헤드셋 컨트롤
 
+### 영상 튜닝
 | 입력 | 손 | 동작 |
 |------|-----|------|
 | **X** (홀드) | 왼손 | 스테레오 컨버전스 감소 |
 | **Y** (홀드) | 왼손 | 스테레오 컨버전스 증가 |
 | **A** (홀드) | 오른손 | 영상 패널 가까이 (`localPosition.z↓`) |
 | **B** (홀드) | 오른손 | 영상 패널 멀리 (`localPosition.z↑`) |
+| **엄지스틱** ↕↔ | 오른손 | 영상 패널 상하/좌우 이동 (팬) |
+| **엄지스틱 클릭** | 오른손 | 패널 위치 초기화 (x/y 팬 + z 거리, 시작 위치로) |
 | 좌/우 눈 스왑 | — | 인스펙터 `Swap Eyes` (깊이가 반대로 느껴질 때) |
 
-로그(`[Overlay] convergence=...` / `distance=...`)에서 편한 값을 찾은 뒤,
-`VideoOverlayController.convergence` 와 VideoLayer `localPosition.z` 에 고정하고
+로그(`[Overlay] convergence=...` / `distance=...` / `pan=...`)에서 편한 값을 찾은 뒤,
+`VideoOverlayController.convergence` 와 VideoLayer `localPosition` 에 고정하고
 *Enable Button Tuning* 을 해제한다.
+
+### IP 설정 (`IpConfigController`)
+ROS 발행 대상 IP 를 **재빌드 없이** 앱 안에서 변경한다. (영상 수신은 UDP `Any` 바인딩이라 무관 — 바뀌는 건 업링크뿐.)
+
+| 입력 | 손 | 동작 |
+|------|-----|------|
+| **Menu** | 왼손 | IP 편집기 열기 / (열려 있으면) 취소하고 닫기 |
+| **엄지스틱** ←/→ | 왼손 | 편집할 자리(옥텟) 선택 (`[ ]` 표시) |
+| **엄지스틱** ↑/↓ | 왼손 | 선택한 옥텟 값 +/- (0~255, 홀드 시 반복) |
+| **트리거** | 왼손 | 확인 → 즉시 재연결 + `PlayerPrefs` 저장 |
+
+- 편집기가 뜨면 영상 오버레이가 잠시 숨겨진다(컴포지터 레이어가 앱 화면 위에 합성되므로). 확인/취소 시 복원.
+- 저장값은 앱 재실행 후에도 유지되며 씬의 ROS Settings 보다 우선한다.
+- Quest 는 Unity `TouchScreenKeyboard` 를 지원하지 않아 시스템 키보드 대신 이 컨트롤러 방식으로 입력한다.
 
 ---
 

@@ -27,11 +27,20 @@ namespace VrTeleop
         public bool enableButtonTuning = true;
         public float tuneSpeed = 0.2f;
 
-        [Header("영상 패널 거리 (X/Y 버튼)")]
-        [Tooltip("X(가까이)/Y(멀리) 홀드 시 초당 이동 거리(m)")]
+        [Header("영상 패널 거리 (A/B 버튼)")]
+        [Tooltip("A(가까이)/B(멀리) 홀드 시 초당 이동 거리(m)")]
         public float distanceSpeed = 1.5f;
         public float minDistance = 0.5f;
         public float maxDistance = 10f;
+
+        [Header("영상 패널 위치 (오른손 엄지스틱)")]
+        [Tooltip("오른손 엄지스틱으로 패널을 상하/좌우 이동. 초당 이동 거리(m)")]
+        public float panSpeed = 1.0f;
+        [Tooltip("데드존 미만 입력은 무시 (스틱 드리프트 방지)")]
+        public float stickDeadzone = 0.15f;
+        [Tooltip("중심에서 벗어날 수 있는 최대 좌우/상하 거리(m)")]
+        public float maxPanX = 3f;
+        public float maxPanY = 3f;
 
 #if USE_META_XR
         OVROverlay _overlay;
@@ -95,6 +104,10 @@ namespace VrTeleop
         float _lastC = float.NaN;
         bool _lastSwap;
 
+        // 엄지스틱 클릭 시 되돌릴 초기 패널 위치 (x/y 팬 + z 거리)
+        Vector3 _homePos;
+        bool _homeSet;
+
         void Update()
         {
             if (!_surfaceInit) { InitSurface(); return; }
@@ -136,6 +149,29 @@ namespace VrTeleop
                 transform.localPosition = p;
                 if (Time.frameCount % 15 == 0) Debug.Log($"[Overlay] distance={p.z:F2}m");
             }
+
+            // 최초 진입 시 현재 위치를 홈(초기 위치)으로 기억
+            if (!_homeSet) { _homePos = transform.localPosition; _homeSet = true; }
+
+            // 오른손 엄지스틱 클릭: 패널 위치(x/y 팬 + z 거리)를 초기값으로 리셋
+            if (OVRInput.GetDown(OVRInput.RawButton.RThumbstick))
+            {
+                transform.localPosition = _homePos;
+                Debug.Log($"[Overlay] pos reset -> ({_homePos.x:F2},{_homePos.y:F2},{_homePos.z:F2})");
+            }
+
+            // 오른손 엄지스틱: 영상 패널 좌우(X)/상하(Y) 이동
+            // RTouch 를 명시해야 확실히 오른손 스틱을 읽는다 (Secondary 만 쓰면 활성 컨트롤러 매핑에 따라 0 이 나올 수 있음)
+            Vector2 stick = OVRInput.Get(OVRInput.Axis2D.PrimaryThumbstick, OVRInput.Controller.RTouch);
+            if (Time.frameCount % 30 == 0) Debug.Log($"[Overlay] Rstick=({stick.x:F2},{stick.y:F2})");
+            if (stick.magnitude > stickDeadzone)
+            {
+                var p = transform.localPosition;
+                p.x = Mathf.Clamp(p.x + stick.x * panSpeed * Time.deltaTime, -maxPanX, maxPanX);
+                p.y = Mathf.Clamp(p.y + stick.y * panSpeed * Time.deltaTime, -maxPanY, maxPanY);
+                transform.localPosition = p;
+                if (Time.frameCount % 15 == 0) Debug.Log($"[Overlay] pan=({p.x:F2},{p.y:F2})m");
+            }
         }
 
         void OnSurfaceCreated()
@@ -143,11 +179,25 @@ namespace VrTeleop
             decoder.SetSurface(_overlay.externalSurfaceObject);
             Debug.Log("[Overlay] external surface -> decoder");
         }
+
+        // 영상 오버레이 표시/숨김 (외부 서피스 유지, 컴포지터 제출만 on/off).
+        // IP 편집 등 앱 화면(3D 텍스트)을 앞에 보여야 할 때 사용.
+        public void SetVideoHidden(bool h)
+        {
+            if (_overlay != null)
+            {
+                _overlay.hidden = h;
+                Debug.Log($"[Overlay] hidden={h}");
+            }
+            else Debug.LogWarning("[Overlay] SetVideoHidden: _overlay null");
+        }
 #else
         void Awake()
         {
             Debug.LogWarning("[Overlay] Meta XR SDK 미설치(USE_META_XR 미정의). OVROverlay 배선 생략.");
         }
+
+        public void SetVideoHidden(bool h) { /* no-op (USE_META_XR 미정의) */ }
 #endif
     }
 }
