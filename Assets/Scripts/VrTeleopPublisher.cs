@@ -42,9 +42,9 @@ namespace VrTeleop
         {
             _period = 1f / rateHz;
             _ros = ROSConnection.GetOrCreateInstance();
-            _ros.RegisterPublisher<PoseStampedMsg>("/vr/head_pose");
-            _ros.RegisterPublisher<PoseArrayMsg>("/vr/left_hand");
-            _ros.RegisterPublisher<PoseArrayMsg>("/vr/right_hand");
+            _ros.RegisterPublisher<PoseStampedMsg>("/vr/hmd_pose");
+            _ros.RegisterPublisher<PoseArrayMsg>("/vr/left_hand_pose");
+            _ros.RegisterPublisher<PoseArrayMsg>("/vr/right_hand_pose");
         }
 
         void Update()
@@ -64,12 +64,12 @@ namespace VrTeleop
                         orientation = head.rotation.To<FLU>()
                     }
                 };
-                _ros.Publish("/vr/head_pose", h);
+                _ros.Publish("/vr/hmd_pose", h);
             }
 
 #if USE_META_XR
-            if (leftHand != null) _ros.Publish("/vr/left_hand", HandToPoseArray(leftHand));
-            if (rightHand != null) _ros.Publish("/vr/right_hand", HandToPoseArray(rightHand));
+            if (leftHand != null) _ros.Publish("/vr/left_hand_pose", HandToPoseArray(leftHand));
+            if (rightHand != null) _ros.Publish("/vr/right_hand_pose", HandToPoseArray(rightHand));
 #endif
         }
 
