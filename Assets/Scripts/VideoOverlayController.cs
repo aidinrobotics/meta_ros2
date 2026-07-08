@@ -117,17 +117,18 @@ namespace VrTeleop
         {
             if (!enableButtonTuning) return;
 
-            // X(Three)/Y(Four): convergence −/+ (왼손, 홀드 연속)
+            // 왼손 X/Y: convergence −/+ (홀드 연속)
+            // RawButton 으로 물리 버튼 지정 — Button.One/Two 는 A와 X/Y 가 공유돼 크로스토크 발생
             float dir = 0f;
-            if (OVRInput.Get(OVRInput.Button.Three)) dir -= 1f;
-            if (OVRInput.Get(OVRInput.Button.Four)) dir += 1f;
+            if (OVRInput.Get(OVRInput.RawButton.X)) dir -= 1f;
+            if (OVRInput.Get(OVRInput.RawButton.Y)) dir += 1f;
             if (dir != 0f)
                 convergence = Mathf.Clamp(convergence + dir * tuneSpeed * Time.deltaTime, -0.3f, 0.3f);
 
-            // A(One)/B(Two): 영상 패널 거리(Z) 가까이/멀리 (오른손, 홀드 연속)
+            // 오른손 A/B: 영상 패널 거리(Z) 가까이/멀리 (홀드 연속)
             float dz = 0f;
-            if (OVRInput.Get(OVRInput.Button.One)) dz -= 1f; // A: 가까이
-            if (OVRInput.Get(OVRInput.Button.Two)) dz += 1f; // B: 멀리
+            if (OVRInput.Get(OVRInput.RawButton.A)) dz -= 1f; // A: 가까이
+            if (OVRInput.Get(OVRInput.RawButton.B)) dz += 1f; // B: 멀리
             if (dz != 0f)
             {
                 var p = transform.localPosition;
