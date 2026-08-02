@@ -32,6 +32,7 @@ RB-Y1 로봇의 **양방향 저지연 VR 원격조작**을 위한 Meta Quest 3 U
 | `VideoOverlayController.cs` | OVROverlay 외부 서피스를 **파싱된 해상도로 생성**, SBS 를 좌 `(0,0,0.5,1)` / 우 `(0.5,0,0.5,1)` 눈으로 분리, 컨트롤러 버튼·**오른손 스틱**으로 컨버전스·패널 거리·**패널 위치(팬)** 실시간 튜닝 |
 | `VrTeleopPublisher.cs` | 헤드셋+손 포즈를 ROS-TCP 로 60Hz 발행, Unity→ROS `FLU` 좌표 변환, **인식된 3D 손 메시 숨김 옵션**(`hideHandMesh`, 관절 발행은 유지) |
 | `IpConfigController.cs` | **앱 내에서 ROS 발행 IP 변경**(재빌드 불필요). 왼손 Menu 버튼 → 컨트롤러로 옥텟 편집, `PlayerPrefs` 저장(재실행 유지) |
+| `RobotStateDisplay.cs` | 로봇 상태(`/aidin_rby1_vive_teleop/state`, `std_msgs/String`)를 **영상 캔버스 하단 상태바**로 표시. 영상 위에 보이도록 별도 OVROverlay 레이어(`compositionDepth` 영상보다 −1)로 합성, 상태별 색상, **수신 끊김 시 `NO DATA`** |
 
 씬 배선 상세는 [`Assets/Scripts/README_VrTeleop.md`](Assets/Scripts/README_VrTeleop.md) 참고.
 
@@ -66,7 +67,8 @@ USE_META_XR;USE_ROS_TCP
 
 ### 3. 씬 (`Assets/Scenes/SampleScene.unity`)
 - **OVRCameraRig** (OVRManager: Hand Tracking = *Controllers And Hands*, Quest 3)
-- **VideoLayer** (`CenterEyeAnchor` 자식): `OVROverlay` + `RtpH264Receiver` + `VideoDecoder` + `VideoOverlayController`; Quad 스케일 **16:9**(1.7778:1), 거리 `localPosition.z`(기본 3m). 해상도는 SPS에서 자동 감지되어 서피스 크기가 자동 정렬됨
+- **VideoLayer** (`CenterEyeAnchor` 자식): `OVROverlay` + `RtpH264Receiver` + `VideoDecoder` + `VideoOverlayController` + `RobotStateDisplay`; Quad 스케일 **16:9**(1.7778:1), 거리 `localPosition.z`(기본 3m). 해상도는 SPS에서 자동 감지되어 서피스 크기가 자동 정렬됨
+  - `RobotStateDisplay`: 상태바를 영상 패널의 자식으로 런타임 생성(추가 배선 불필요) — `State Topic`(기본 `/aidin_rby1_vive_teleop/state`), `Width/Height Ratio`(패널 대비 크기, 기본 0.35 / 0.07), `Bottom Margin`(하단 여백, 음수면 패널 밖 아래), `Stale Timeout`(기본 3초, 초과 시 `NO DATA`)
 - **RosBridge**: `ROSConnection` + `VrTeleopPublisher` + `IpConfigController`
   - `VrTeleopPublisher`: head = CenterEyeAnchor, hands = OVRSkeleton, `Hide Hand Mesh`(기본 ON)
   - `IpConfigController`: `Video Overlay` 는 비워두면 자동 검색(씬에 OVROverlay 여러 개면 VideoLayer 직접 지정), `Text Size`(기본 0.01)·`Display Distance`(기본 1.2m) 로 편집 패널 크기 조정

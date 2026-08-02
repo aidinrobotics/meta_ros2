@@ -190,7 +190,13 @@ namespace VrTeleop
                 Debug.Log($"[Overlay] hidden={h}");
             }
             else Debug.LogWarning("[Overlay] SetVideoHidden: _overlay null");
+
+            // 상태바도 컴포지터 레이어라 앱 화면보다 위에 뜬다 -> 같이 숨긴다
+            if (_stateDisplay == null) _stateDisplay = FindObjectOfType<RobotStateDisplay>();
+            if (_stateDisplay != null) _stateDisplay.SetHidden(h);
         }
+
+        RobotStateDisplay _stateDisplay;
 #else
         void Awake()
         {

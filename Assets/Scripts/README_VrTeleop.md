@@ -28,6 +28,8 @@ USE_META_XR;USE_ROS_TCP
    - `RtpH264Receiver`  (port=5600, Jetson `--port` 와 일치)
    - `VideoDecoder`     (width/height = SBS 해상도. `--scale` 적용 시 맞추기)
    - `VideoOverlayController` (decoder 필드에 위 VideoDecoder 연결)
+   - `RobotStateDisplay` (로봇 상태 `std_msgs/String` 을 캔버스 하단 상태바로 표시.
+     상태바(TextMesh→RenderTexture→OVROverlay)는 런타임 생성되므로 별도 배선 없음)
 3. 빈 GameObject **RosBridge** 생성 후:
    - `ROSConnection` (Inspector 에서 제어 PC IP / 포트 설정. 앱 내 변경도 가능 — `IpConfigController`)
    - `VrTeleopPublisher`
@@ -43,7 +45,19 @@ RtpH264Receiver ──Frames(ConcurrentQueue)──> VideoDecoder ──render�
 VideoOverlayController: externalSurfaceObject ─────┘ (SBS 좌/우 눈 분리)
 
 VrTeleopPublisher ──ROS-TCP(TCP)──> 제어 PC ROS-TCP-Endpoint  (/vr/hmd_pose, /vr/{left,right}_hand_pose)
+
+로봇 ──/aidin_rby1_vive_teleop/state(String)──> RobotStateDisplay
+      └▶ TextMesh(오프스크린) ─Camera─> RenderTexture ─> OVROverlay(Quad, compositionDepth = 영상−1)
 ```
+
+> 상태바가 영상 위에 보이는 이유: 영상은 컴포지터 레이어(OVROverlay)라 앱이 그린 3D 텍스트를
+> 항상 덮는다. 그래서 상태바도 레이어로 올리고 `compositionDepth` 를 영상보다 **작게**(= 더 앞) 준다.
+>
+> 상태바 RenderTexture 주의점(글씨 잔상 원인 2가지, 둘 다 처리됨):
+> - **MSAA 금지** — OVROverlay 는 모바일에서 RT → 스왑체인을 `CopyTexture` 로 그대로 복사한다
+>   (`PopulateLayer` 의 `bypassBlit`). 멀티샘플 RT 는 이 복사가 성립하지 않아 이전 프레임이 남는다.
+> - **clear 를 믿지 말 것** — URP 에서 수동 `Camera.Render()` 는 중간 타깃을 재사용할 수 있다.
+>   배경을 불투명 Quad 로 **그려서** 덮는다(`barColor` 알파는 1 유지).
 
 ## 6. 테스트 순서
 1. 데스크톱에서 Jetson 파이프라인을 Quest IP 로 송출
