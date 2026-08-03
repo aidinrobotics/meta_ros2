@@ -634,7 +634,6 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::VrTeleop.RobotStateDisplay
   stateTopic: /aidin_rby1_vive_teleop/state
   label: STATE
-  staleTimeout: 3
   videoPanel: {fileID: 932641486}
   widthRatio: 0.35
   heightRatio: 0.07

@@ -8,7 +8,8 @@ namespace VrTeleop
 {
     /// <summary>
     /// 로봇 상태(<c>std_msgs/String</c>, 기본 <c>/aidin_rby1_vive_teleop/state</c>)를
-    /// 영상 캔버스 하단에 상태바로 띄운다. (IDLE / SESSION / HOMING / SHUTDOWN ...)
+    /// 영상 캔버스 하단에 상태바로 띄운다. (IDLE / SESSION / TELEOP / HOMING / SHUTDOWN ...)
+    /// 상태가 바뀔 때만 발행되는 토픽이라, 마지막으로 받은 상태를 계속 유지한다.
     ///
     /// 왜 그냥 TextMesh 를 안 쓰나:
     ///   영상은 OVROverlay(컴포지터 레이어)라 앱이 그린 3D 텍스트보다 항상 위에 합성된다.
@@ -31,8 +32,6 @@ namespace VrTeleop
         public string stateTopic = "/aidin_rby1_vive_teleop/state";
         [Tooltip("상태 앞에 붙는 라벨. 비우면 상태 문자열만 표시")]
         public string label = "STATE";
-        [Tooltip("이 시간(초) 동안 수신이 없으면 NO DATA 로 표시 (0 = 비활성)")]
-        public float staleTimeout = 3f;
 
         [Header("배치 (영상 패널 기준)")]
         [Tooltip("영상 패널(OVROverlay) Transform. 비우면 이 오브젝트")]
@@ -50,7 +49,7 @@ namespace VrTeleop
         public Color barColor = Color.black;
         [Tooltip("기본 글자색 (colorByState 로 매칭되지 않는 상태)")]
         public Color textColor = Color.white;
-        [Tooltip("상태별 글자색 사용 (SESSION=초록, HOMING=노랑, SHUTDOWN=빨강, IDLE=회색)")]
+        [Tooltip("상태별 글자색 사용 (SESSION·TELEOP=초록, HOMING=노랑, SHUTDOWN=빨강, IDLE=회색)")]
         public bool colorByState = true;
         [Tooltip("상태바 텍스처 가로 해상도(px). 세로는 상태바 비율에서 자동 계산")]
         public int texWidth = 2048;
@@ -61,9 +60,9 @@ namespace VrTeleop
 
         const string NoData = "NO DATA";
 
-        string _state = "";          // 마지막 수신 상태
-        float _lastRxTime = -1f;     // 마지막 수신 시각(realtime)
-        bool _stale;
+        // 상태 토픽은 상태가 "바뀔 때만" 발행된다 -> 수신 타임아웃으로 끊김을 판정하면 정상 동작 중에도
+        // 표시가 사라진다. 마지막으로 받은 상태를 계속 띄우고, 한 번도 못 받았을 때만 NO DATA.
+        string _state = "";
         string _shown;               // 현재 텍스처에 그려져 있는 문자열
         bool _dirty;
         int _pendingRenders;         // 텍스트 변경 후 다시 그릴 프레임 수(메시 갱신 1프레임 지연 대응)
@@ -109,21 +108,12 @@ namespace VrTeleop
         void OnState(StringMsg msg)
         {
             _state = msg.data ?? "";
-            _lastRxTime = Time.realtimeSinceStartup;
-            _stale = false;
             Refresh();
         }
 #endif
 
         void LateUpdate()
         {
-            // 수신 끊김 감지 (연결이 끊겨도 마지막 상태가 그대로 남아 오해하는 것 방지)
-            if (staleTimeout > 0f && _lastRxTime >= 0f)
-            {
-                bool stale = (Time.realtimeSinceStartup - _lastRxTime) > staleTimeout;
-                if (stale != _stale) { _stale = stale; Refresh(); }
-            }
-
             PlaceBar();
 
             if (_dirty) { _dirty = false; _pendingRenders = 2; }
@@ -137,7 +127,7 @@ namespace VrTeleop
 
         void Refresh()
         {
-            if (_stale || string.IsNullOrEmpty(_state))
+            if (string.IsNullOrEmpty(_state))   // 첫 수신 전
             {
                 SetText(NoData, Color.gray);
                 return;
@@ -152,7 +142,8 @@ namespace VrTeleop
         {
             switch (s.ToUpperInvariant())
             {
-                case "SESSION": return new Color(0.40f, 1f, 0.45f);
+                case "SESSION":
+                case "TELEOP": return new Color(0.40f, 1f, 0.45f);
                 case "HOMING": return new Color(1f, 0.82f, 0.25f);
                 case "SHUTDOWN": return new Color(1f, 0.35f, 0.30f);
                 case "IDLE": return new Color(0.80f, 0.80f, 0.80f);
